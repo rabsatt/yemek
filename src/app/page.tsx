@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { UtensilsCrossed } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { getEntries, getInsights, createEntry } from '@/lib/firestore'
+import { getEntries, getInsights, createEntry, createMultiItemEntry, deleteEntry } from '@/lib/firestore'
 import { Header } from '@/components/layout/Header'
 import { TodaySummary } from '@/components/dashboard/TodaySummary'
 import { RecentMeals } from '@/components/dashboard/RecentMeals'
@@ -70,20 +70,52 @@ export default function DashboardPage() {
       else if (hour >= 11 && hour < 15) mealType = 'LUNCH'
       else if (hour >= 15 && hour < 18) mealType = 'SNACK'
 
-      await createEntry(user.uid, {
-        placeId: entry.placeId,
-        place: entry.place,
-        mealItemId: entry.mealItemId,
-        mealItem: entry.mealItem,
-        calories: entry.calories || undefined,
-        mealType,
-      })
+      // Handle both multi-item and legacy single-item entries
+      if (entry.items && entry.items.length > 0) {
+        await createMultiItemEntry(user.uid, {
+          placeId: entry.placeId,
+          place: entry.place,
+          items: entry.items.map(item => ({
+            mealItem: item.mealItem as any,
+            calories: item.calories ?? undefined,
+            quantity: item.quantity,
+          })),
+          mealType,
+        })
+      } else if (entry.mealItem && entry.mealItemId) {
+        // Legacy single-item entry
+        await createEntry(user.uid, {
+          placeId: entry.placeId,
+          place: entry.place,
+          mealItemId: entry.mealItemId,
+          mealItem: entry.mealItem,
+          calories: entry.calories || undefined,
+          mealType,
+        })
+      }
 
       fetchData()
     } catch (error) {
       console.error('Failed to quick log:', error)
     } finally {
       setQuickLogging(false)
+    }
+  }
+
+  const handleEdit = (entry: MealEntry) => {
+    // Navigate to edit page with entry ID
+    router.push(`/edit/${entry.id}`)
+  }
+
+  const handleDelete = async (entryId: string) => {
+    if (!user) return
+
+    try {
+      await deleteEntry(user.uid, entryId)
+      // Refresh data after deletion
+      fetchData()
+    } catch (error) {
+      console.error('Failed to delete entry:', error)
     }
   }
 
@@ -115,7 +147,12 @@ export default function DashboardPage() {
 
         {/* Recent meals or empty state */}
         {entries.length > 0 ? (
-          <RecentMeals entries={entries} onQuickLog={handleQuickLog} />
+          <RecentMeals
+            entries={entries}
+            onQuickLog={handleQuickLog}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+          />
         ) : (
           <EmptyState
             icon={UtensilsCrossed}

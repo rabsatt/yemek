@@ -3,11 +3,11 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
-import { createEntry } from '@/lib/firestore'
+import { createMultiItemEntry } from '@/lib/firestore'
 import { PlaceSelector } from '@/components/meal-entry/PlaceSelector'
-import { MealSelector } from '@/components/meal-entry/MealSelector'
+import { MealSelector, SelectedMealItem } from '@/components/meal-entry/MealSelector'
 import { EntryConfirm } from '@/components/meal-entry/EntryConfirm'
-import type { Place, MealItem, MealType } from '@/types'
+import type { Place, MealType } from '@/types'
 
 type Step = 1 | 2 | 3
 
@@ -16,7 +16,7 @@ export default function LogMealPage() {
   const { user } = useAuth()
   const [step, setStep] = useState<Step>(1)
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null)
-  const [selectedMeal, setSelectedMeal] = useState<MealItem | null>(null)
+  const [selectedItems, setSelectedItems] = useState<SelectedMealItem[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleSelectPlace = (place: Place) => {
@@ -24,26 +24,28 @@ export default function LogMealPage() {
     setStep(2)
   }
 
-  const handleSelectMeal = (meal: MealItem) => {
-    setSelectedMeal(meal)
+  const handleSelectMeals = (items: SelectedMealItem[]) => {
+    setSelectedItems(items)
     setStep(3)
   }
 
   const handleConfirm = async (data: {
-    calories: number | null
+    items: SelectedMealItem[]
     mealType: MealType
     notes: string
   }) => {
-    if (!selectedPlace || !selectedMeal || !user) return
+    if (!selectedPlace || data.items.length === 0 || !user) return
 
     setIsSubmitting(true)
     try {
-      await createEntry(user.uid, {
+      await createMultiItemEntry(user.uid, {
         placeId: selectedPlace.id,
         place: selectedPlace,
-        mealItemId: selectedMeal.id,
-        mealItem: selectedMeal,
-        calories: data.calories || undefined,
+        items: data.items.map(item => ({
+          mealItem: item.mealItem,
+          calories: item.calories,
+          quantity: item.quantity,
+        })),
         mealType: data.mealType,
         notes: data.notes || undefined,
       })
@@ -63,15 +65,16 @@ export default function LogMealPage() {
       {step === 2 && selectedPlace && (
         <MealSelector
           place={selectedPlace}
-          onSelect={handleSelectMeal}
+          onSelect={handleSelectMeals}
           onBack={() => setStep(1)}
+          initialSelection={selectedItems}
         />
       )}
 
-      {step === 3 && selectedPlace && selectedMeal && (
+      {step === 3 && selectedPlace && selectedItems.length > 0 && (
         <EntryConfirm
           place={selectedPlace}
-          meal={selectedMeal}
+          items={selectedItems}
           onBack={() => setStep(2)}
           onConfirm={handleConfirm}
           isSubmitting={isSubmitting}

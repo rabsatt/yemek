@@ -25,12 +25,27 @@ export interface MealItem {
   updatedAt: Date
 }
 
+// An item within a meal entry (supports multiple items per meal)
+export interface EntryItem {
+  mealItemId: string
+  mealItem: {
+    id: string
+    name: string
+    defaultCalories?: number | null
+    category: MealCategory
+  }
+  calories?: number | null
+  quantity: number
+}
+
 export interface MealEntry {
   id: string
   placeId: string
   place: Place
-  mealItemId: string
-  mealItem: MealItem
+  // Support both single item (legacy) and multiple items
+  mealItemId?: string
+  mealItem?: MealItem
+  items?: EntryItem[]
   calories?: number | null
   eatenAt: Date
   mealType: MealType

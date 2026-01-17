@@ -1,19 +1,20 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronLeft, Check } from 'lucide-react'
+import { ChevronLeft, Check, Minus, Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Card } from '@/components/ui/Card'
 import { PlaceTypeIcon } from '@/components/places/PlaceTypeIcon'
-import type { Place, MealItem, MealType } from '@/types'
+import type { Place, MealType } from '@/types'
+import type { SelectedMealItem } from './MealSelector'
 
 interface EntryConfirmProps {
   place: Place
-  meal: MealItem
+  items: SelectedMealItem[]
   onBack: () => void
   onConfirm: (data: {
-    calories: number | null
+    items: SelectedMealItem[]
     mealType: MealType
     notes: string
   }) => void
@@ -37,20 +38,52 @@ function getDefaultMealType(): MealType {
 
 export function EntryConfirm({
   place,
-  meal,
+  items: initialItems,
   onBack,
   onConfirm,
   isSubmitting,
 }: EntryConfirmProps) {
-  const [calories, setCalories] = useState(
-    meal.defaultCalories?.toString() || ''
-  )
+  const [items, setItems] = useState<SelectedMealItem[]>(initialItems)
   const [mealType, setMealType] = useState<MealType>(getDefaultMealType())
   const [notes, setNotes] = useState('')
 
+  const updateItemCalories = (mealItemId: string, calories: number | undefined) => {
+    setItems(prev =>
+      prev.map(item =>
+        item.mealItem.id === mealItemId
+          ? { ...item, calories }
+          : item
+      )
+    )
+  }
+
+  const updateItemQuantity = (mealItemId: string, quantity: number) => {
+    if (quantity <= 0) {
+      setItems(prev => prev.filter(item => item.mealItem.id !== mealItemId))
+    } else {
+      setItems(prev =>
+        prev.map(item =>
+          item.mealItem.id === mealItemId
+            ? { ...item, quantity }
+            : item
+        )
+      )
+    }
+  }
+
+  const removeItem = (mealItemId: string) => {
+    setItems(prev => prev.filter(item => item.mealItem.id !== mealItemId))
+  }
+
+  const totalCalories = items.reduce((sum, item) => {
+    const cal = item.calories ?? item.mealItem.defaultCalories ?? 0
+    return sum + (cal * item.quantity)
+  }, 0)
+
   const handleSubmit = () => {
+    if (items.length === 0) return
     onConfirm({
-      calories: calories ? parseInt(calories) : null,
+      items,
       mealType,
       notes,
     })
@@ -70,25 +103,95 @@ export function EntryConfirm({
       </div>
 
       <div className="flex-1 overflow-auto p-4 space-y-4">
-        {/* Summary card */}
-        <Card className="space-y-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
-              <PlaceTypeIcon
-                type={place.type as any}
-                className="w-5 h-5 text-gray-600"
-              />
-            </div>
-            <div>
-              <div className="text-sm text-gray-500">Place</div>
-              <div className="font-medium">{place.name}</div>
-            </div>
+        {/* Place card */}
+        <Card className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
+            <PlaceTypeIcon
+              type={place.type as any}
+              className="w-5 h-5 text-gray-600"
+            />
           </div>
-          <div className="border-t border-gray-100 pt-3">
-            <div className="text-sm text-gray-500">Meal</div>
-            <div className="font-medium">{meal.name}</div>
+          <div>
+            <div className="text-sm text-gray-500">Place</div>
+            <div className="font-medium">{place.name}</div>
           </div>
         </Card>
+
+        {/* Items list */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-medium text-gray-900">Items</h3>
+            <span className="text-sm text-gray-500">
+              {totalCalories > 0 ? `Total: ${totalCalories} cal` : ''}
+            </span>
+          </div>
+
+          {items.map((item) => (
+            <Card key={item.mealItem.id} className="space-y-3">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="font-medium">{item.mealItem.name}</div>
+                  <div className="text-sm text-gray-500">
+                    {item.mealItem.category}
+                  </div>
+                </div>
+                <button
+                  onClick={() => removeItem(item.mealItem.id)}
+                  className="p-1 text-gray-400 hover:text-red-500"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between gap-4">
+                {/* Calories input */}
+                <div className="flex-1">
+                  <Input
+                    type="number"
+                    placeholder="Calories"
+                    value={item.calories?.toString() ?? item.mealItem.defaultCalories?.toString() ?? ''}
+                    onChange={(e) =>
+                      updateItemCalories(
+                        item.mealItem.id,
+                        e.target.value ? parseInt(e.target.value) : undefined
+                      )
+                    }
+                    className="text-sm"
+                  />
+                </div>
+
+                {/* Quantity controls */}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => updateItemQuantity(item.mealItem.id, item.quantity - 1)}
+                    className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200"
+                  >
+                    <Minus className="w-4 h-4" />
+                  </button>
+                  <span className="w-8 text-center font-medium">{item.quantity}</span>
+                  <button
+                    onClick={() => updateItemQuantity(item.mealItem.id, item.quantity + 1)}
+                    className="w-8 h-8 rounded-full bg-primary-500 flex items-center justify-center text-white hover:bg-primary-600"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {item.quantity > 1 && (
+                <div className="text-sm text-gray-500 text-right">
+                  Subtotal: {((item.calories ?? item.mealItem.defaultCalories ?? 0) * item.quantity)} cal
+                </div>
+              )}
+            </Card>
+          ))}
+
+          {items.length === 0 && (
+            <div className="text-center text-gray-500 py-4">
+              No items selected. Go back to add items.
+            </div>
+          )}
+        </div>
 
         {/* Meal type */}
         <div>
@@ -112,15 +215,6 @@ export function EntryConfirm({
           </div>
         </div>
 
-        {/* Calories */}
-        <Input
-          label="Calories (optional)"
-          type="number"
-          placeholder="e.g., 850"
-          value={calories}
-          onChange={(e) => setCalories(e.target.value)}
-        />
-
         {/* Notes */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -142,14 +236,14 @@ export function EntryConfirm({
           className="w-full"
           size="lg"
           onClick={handleSubmit}
-          disabled={isSubmitting}
+          disabled={isSubmitting || items.length === 0}
         >
           {isSubmitting ? (
             'Logging...'
           ) : (
             <>
               <Check className="w-5 h-5 mr-2" />
-              Log Meal
+              Log Meal {totalCalories > 0 ? `(${totalCalories} cal)` : ''}
             </>
           )}
         </Button>

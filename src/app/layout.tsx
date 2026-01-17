@@ -8,7 +8,7 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: 'Meal Tracker',
   description: 'Track your meals, places, and calories',
-  manifest: '/manifest.json',
+  manifest: '/yemek/manifest.json',
 }
 
 export const viewport: Viewport = {

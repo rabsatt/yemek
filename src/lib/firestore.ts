@@ -15,7 +15,7 @@ import {
   serverTimestamp,
 } from 'firebase/firestore'
 import { db } from './firebase'
-import type { Place, MealItem, MealEntry, PlaceType, MealCategory, MealType } from '@/types'
+import type { Place, MealItem, MealEntry, PlaceType, MealCategory, MealType, EntryItem } from '@/types'
 
 // Helper to convert Firestore timestamp to Date
 const toDate = (timestamp: Timestamp | Date): Date => {
@@ -128,6 +128,22 @@ export async function getMeals(
   return meals
 }
 
+export async function getMeal(userId: string, mealId: string): Promise<MealItem | null> {
+  const mealRef = doc(db, 'users', userId, 'meals', mealId)
+  const snapshot = await getDoc(mealRef)
+
+  if (!snapshot.exists()) {
+    return null
+  }
+
+  return {
+    id: snapshot.id,
+    ...snapshot.data(),
+    createdAt: toDate(snapshot.data().createdAt),
+    updatedAt: toDate(snapshot.data().updatedAt),
+  } as MealItem
+}
+
 export async function createMeal(
   userId: string,
   data: { name: string; defaultCalories?: number; category: MealCategory; placeId?: string }
@@ -153,6 +169,23 @@ export async function createMeal(
     createdAt: new Date(),
     updatedAt: new Date(),
   }
+}
+
+export async function updateMeal(
+  userId: string,
+  mealId: string,
+  data: Partial<Omit<MealItem, 'id' | 'createdAt' | 'updatedAt'>>
+): Promise<void> {
+  const mealRef = doc(db, 'users', userId, 'meals', mealId)
+  await updateDoc(mealRef, {
+    ...data,
+    updatedAt: serverTimestamp(),
+  })
+}
+
+export async function deleteMeal(userId: string, mealId: string): Promise<void> {
+  const mealRef = doc(db, 'users', userId, 'meals', mealId)
+  await deleteDoc(mealRef)
 }
 
 export async function incrementMealUsage(userId: string, mealId: string): Promise<void> {
@@ -197,6 +230,24 @@ export async function getEntries(
   return filtered
 }
 
+export async function getEntry(userId: string, entryId: string): Promise<MealEntry | null> {
+  const entryRef = doc(db, 'users', userId, 'entries', entryId)
+  const snapshot = await getDoc(entryRef)
+
+  if (!snapshot.exists()) {
+    return null
+  }
+
+  return {
+    id: snapshot.id,
+    ...snapshot.data(),
+    eatenAt: toDate(snapshot.data().eatenAt),
+    createdAt: toDate(snapshot.data().createdAt),
+    updatedAt: toDate(snapshot.data().updatedAt),
+  } as MealEntry
+}
+
+// Legacy single-item entry creation (for backward compatibility)
 export async function createEntry(
   userId: string,
   data: {
@@ -258,6 +309,177 @@ export async function createEntry(
   }
 }
 
+// New multi-item entry creation
+export async function createMultiItemEntry(
+  userId: string,
+  data: {
+    placeId: string
+    place: Place
+    items: Array<{
+      mealItem: MealItem
+      calories?: number
+      quantity: number
+    }>
+    mealType: MealType
+    notes?: string
+    eatenAt?: Date
+  }
+): Promise<MealEntry> {
+  const entriesRef = collection(db, 'users', userId, 'entries')
+
+  // Calculate total calories from all items
+  const totalCalories = data.items.reduce((sum, item) => {
+    const itemCalories = item.calories ?? item.mealItem.defaultCalories ?? 0
+    return sum + (itemCalories * item.quantity)
+  }, 0)
+
+  const entryItems: EntryItem[] = data.items.map(item => ({
+    mealItemId: item.mealItem.id,
+    mealItem: {
+      id: item.mealItem.id,
+      name: item.mealItem.name,
+      defaultCalories: item.mealItem.defaultCalories,
+      category: item.mealItem.category,
+    },
+    calories: item.calories ?? item.mealItem.defaultCalories ?? null,
+    quantity: item.quantity,
+  }))
+
+  const entryData = {
+    placeId: data.placeId,
+    place: {
+      id: data.place.id,
+      name: data.place.name,
+      type: data.place.type,
+      isHome: data.place.isHome,
+    },
+    items: entryItems,
+    calories: totalCalories || null,
+    mealType: data.mealType,
+    notes: data.notes || null,
+    eatenAt: data.eatenAt ? Timestamp.fromDate(data.eatenAt) : serverTimestamp(),
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  }
+
+  const docRef = await addDoc(entriesRef, entryData)
+
+  // Increment usage counts for place and all meals
+  const usageUpdates = [
+    incrementPlaceUsage(userId, data.placeId),
+    ...data.items.map(item => incrementMealUsage(userId, item.mealItem.id))
+  ]
+  await Promise.all(usageUpdates)
+
+  return {
+    id: docRef.id,
+    placeId: data.placeId,
+    place: data.place,
+    items: entryItems,
+    calories: totalCalories || null,
+    mealType: data.mealType,
+    notes: data.notes || null,
+    eatenAt: data.eatenAt || new Date(),
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  }
+}
+
+export async function updateEntry(
+  userId: string,
+  entryId: string,
+  data: {
+    placeId?: string
+    place?: Place
+    mealItemId?: string
+    mealItem?: MealItem
+    items?: Array<{
+      mealItem: MealItem
+      calories?: number
+      quantity: number
+    }>
+    calories?: number
+    mealType?: MealType
+    notes?: string
+    eatenAt?: Date
+  }
+): Promise<void> {
+  const entryRef = doc(db, 'users', userId, 'entries', entryId)
+
+  const updateData: Record<string, unknown> = {
+    updatedAt: serverTimestamp(),
+  }
+
+  if (data.placeId !== undefined) {
+    updateData.placeId = data.placeId
+  }
+
+  if (data.place) {
+    updateData.place = {
+      id: data.place.id,
+      name: data.place.name,
+      type: data.place.type,
+      isHome: data.place.isHome,
+    }
+  }
+
+  if (data.mealItemId !== undefined) {
+    updateData.mealItemId = data.mealItemId
+  }
+
+  if (data.mealItem) {
+    updateData.mealItem = {
+      id: data.mealItem.id,
+      name: data.mealItem.name,
+      defaultCalories: data.mealItem.defaultCalories,
+      category: data.mealItem.category,
+    }
+  }
+
+  if (data.items) {
+    const entryItems: EntryItem[] = data.items.map(item => ({
+      mealItemId: item.mealItem.id,
+      mealItem: {
+        id: item.mealItem.id,
+        name: item.mealItem.name,
+        defaultCalories: item.mealItem.defaultCalories,
+        category: item.mealItem.category,
+      },
+      calories: item.calories ?? item.mealItem.defaultCalories ?? null,
+      quantity: item.quantity,
+    }))
+    updateData.items = entryItems
+
+    // Recalculate total calories
+    const totalCalories = data.items.reduce((sum, item) => {
+      const itemCalories = item.calories ?? item.mealItem.defaultCalories ?? 0
+      return sum + (itemCalories * item.quantity)
+    }, 0)
+    updateData.calories = totalCalories || null
+  } else if (data.calories !== undefined) {
+    updateData.calories = data.calories
+  }
+
+  if (data.mealType !== undefined) {
+    updateData.mealType = data.mealType
+  }
+
+  if (data.notes !== undefined) {
+    updateData.notes = data.notes || null
+  }
+
+  if (data.eatenAt) {
+    updateData.eatenAt = Timestamp.fromDate(data.eatenAt)
+  }
+
+  await updateDoc(entryRef, updateData)
+}
+
+export async function deleteEntry(userId: string, entryId: string): Promise<void> {
+  const entryRef = doc(db, 'users', userId, 'entries', entryId)
+  await deleteDoc(entryRef)
+}
+
 // ============ INSIGHTS ============
 
 export async function getInsights(userId: string, days: number = 7) {
@@ -295,6 +517,7 @@ export async function getInsights(userId: string, days: number = 7) {
     const dateStr = entry.eatenAt.toISOString().split('T')[0]
     if (dailyData[dateStr]) {
       dailyData[dateStr].mealCount += 1
+      // For multi-item entries, use the total calories; for legacy, use entry calories
       dailyData[dateStr].totalCalories += entry.calories || 0
       if (entry.place.isHome) {
         dailyData[dateStr].homeCount += 1
