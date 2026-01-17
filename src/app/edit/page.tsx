@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ChevronLeft, Check, Minus, Plus, X, Trash2 } from 'lucide-react'
+import { ChevronLeft, Check, Minus, Plus, X, Trash2, Calendar } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { getEntry, getPlaces, getMeals, updateEntry, deleteEntry } from '@/lib/firestore'
 import { Button } from '@/components/ui/Button'
@@ -27,6 +27,28 @@ const mealTypes: { value: MealType; label: string }[] = [
   { value: 'SNACK', label: 'Snack' },
 ]
 
+function formatDateForInput(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function formatDateDisplay(date: Date): string {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const compareDate = new Date(date)
+  compareDate.setHours(0, 0, 0, 0)
+
+  const diffDays = Math.floor((today.getTime() - compareDate.getTime()) / (1000 * 60 * 60 * 24))
+
+  if (diffDays === 0) return 'Today'
+  if (diffDays === 1) return 'Yesterday'
+  if (diffDays === -1) return 'Tomorrow'
+
+  return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+}
+
 export default function EditEntryPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -43,6 +65,8 @@ export default function EditEntryPage() {
   const [items, setItems] = useState<EditItem[]>([])
   const [mealType, setMealType] = useState<MealType>('DINNER')
   const [notes, setNotes] = useState('')
+  const [eatenAt, setEatenAt] = useState<Date>(new Date())
+  const [showDatePicker, setShowDatePicker] = useState(false)
 
   // Modals
   const [showPlaceSelector, setShowPlaceSelector] = useState(false)
@@ -79,6 +103,7 @@ export default function EditEntryPage() {
       setSelectedPlace(data.place)
       setMealType(data.mealType)
       setNotes(data.notes || '')
+      setEatenAt(data.eatenAt)
 
       // Handle both multi-item and legacy entries
       if (data.items && data.items.length > 0) {
@@ -186,6 +211,7 @@ export default function EditEntryPage() {
         })),
         mealType,
         notes: notes || undefined,
+        eatenAt,
       })
 
       router.push('/')
@@ -358,6 +384,67 @@ export default function EditEntryPage() {
             <Plus className="w-5 h-5 mr-2" />
             Add item
           </Button>
+        </div>
+
+        {/* Date picker */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Date
+          </label>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowDatePicker(!showDatePicker)}
+              className="w-full flex items-center gap-3 px-4 py-3 border border-gray-300 rounded-lg text-left hover:bg-gray-50"
+            >
+              <Calendar className="w-5 h-5 text-gray-400" />
+              <span className="font-medium">{formatDateDisplay(eatenAt)}</span>
+            </button>
+
+            {showDatePicker && (
+              <div className="absolute top-full left-0 right-0 mt-2 p-4 bg-white border border-gray-200 rounded-lg shadow-lg z-20">
+                <input
+                  type="date"
+                  value={formatDateForInput(eatenAt)}
+                  max={formatDateForInput(new Date())}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      const [year, month, day] = e.target.value.split('-').map(Number)
+                      const newDate = new Date(eatenAt)
+                      newDate.setFullYear(year, month - 1, day)
+                      setEatenAt(newDate)
+                      setShowDatePicker(false)
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+                <div className="flex gap-2 mt-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEatenAt(new Date())
+                      setShowDatePicker(false)
+                    }}
+                    className="flex-1 py-2 px-3 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200"
+                  >
+                    Today
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const yesterday = new Date()
+                      yesterday.setDate(yesterday.getDate() - 1)
+                      setEatenAt(yesterday)
+                      setShowDatePicker(false)
+                    }}
+                    className="flex-1 py-2 px-3 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200"
+                  >
+                    Yesterday
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Meal type */}

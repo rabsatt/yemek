@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronLeft, Check, Minus, Plus, X } from 'lucide-react'
+import { ChevronLeft, Check, Minus, Plus, X, Calendar } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Card } from '@/components/ui/Card'
@@ -17,9 +17,11 @@ interface EntryConfirmProps {
     items: SelectedMealItem[]
     mealType: MealType
     notes: string
+    eatenAt: Date
   }) => void
   isSubmitting: boolean
   defaultMealType?: MealType
+  defaultDate?: Date
 }
 
 const mealTypes: { value: MealType; label: string }[] = [
@@ -37,6 +39,28 @@ function getDefaultMealType(): MealType {
   return 'DINNER'
 }
 
+function formatDateForInput(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function formatDateDisplay(date: Date): string {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const compareDate = new Date(date)
+  compareDate.setHours(0, 0, 0, 0)
+
+  const diffDays = Math.floor((today.getTime() - compareDate.getTime()) / (1000 * 60 * 60 * 24))
+
+  if (diffDays === 0) return 'Today'
+  if (diffDays === 1) return 'Yesterday'
+  if (diffDays === -1) return 'Tomorrow'
+
+  return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+}
+
 export function EntryConfirm({
   place,
   items: initialItems,
@@ -44,10 +68,13 @@ export function EntryConfirm({
   onConfirm,
   isSubmitting,
   defaultMealType,
+  defaultDate,
 }: EntryConfirmProps) {
   const [items, setItems] = useState<SelectedMealItem[]>(initialItems)
   const [mealType, setMealType] = useState<MealType>(defaultMealType || getDefaultMealType())
   const [notes, setNotes] = useState('')
+  const [eatenAt, setEatenAt] = useState<Date>(defaultDate || new Date())
+  const [showDatePicker, setShowDatePicker] = useState(false)
 
   const updateItemCalories = (mealItemId: string, calories: number | undefined) => {
     setItems(prev =>
@@ -82,12 +109,19 @@ export function EntryConfirm({
     return sum + (cal * item.quantity)
   }, 0)
 
+  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newDate = new Date(e.target.value + 'T12:00:00')
+    setEatenAt(newDate)
+    setShowDatePicker(false)
+  }
+
   const handleSubmit = () => {
     if (items.length === 0) return
     onConfirm({
       items,
       mealType,
       notes,
+      eatenAt,
     })
   }
 
@@ -105,6 +139,58 @@ export function EntryConfirm({
       </div>
 
       <div className="flex-1 overflow-auto p-4 space-y-4">
+        {/* Date selector */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Date
+          </label>
+          <div className="relative">
+            <button
+              onClick={() => setShowDatePicker(!showDatePicker)}
+              className="w-full flex items-center gap-3 px-4 py-3 border border-gray-300 rounded-lg text-left hover:bg-gray-50"
+            >
+              <Calendar className="w-5 h-5 text-gray-400" />
+              <span className="flex-1 font-medium">{formatDateDisplay(eatenAt)}</span>
+              <span className="text-sm text-gray-500">
+                {eatenAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+              </span>
+            </button>
+            {showDatePicker && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 p-3">
+                <input
+                  type="date"
+                  value={formatDateForInput(eatenAt)}
+                  onChange={handleDateChange}
+                  max={formatDateForInput(new Date())}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+                <div className="flex gap-2 mt-2">
+                  <button
+                    onClick={() => {
+                      setEatenAt(new Date())
+                      setShowDatePicker(false)
+                    }}
+                    className="flex-1 px-3 py-1.5 text-sm bg-gray-100 rounded-lg hover:bg-gray-200"
+                  >
+                    Today
+                  </button>
+                  <button
+                    onClick={() => {
+                      const yesterday = new Date()
+                      yesterday.setDate(yesterday.getDate() - 1)
+                      setEatenAt(yesterday)
+                      setShowDatePicker(false)
+                    }}
+                    className="flex-1 px-3 py-1.5 text-sm bg-gray-100 rounded-lg hover:bg-gray-200"
+                  >
+                    Yesterday
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Place card */}
         <Card className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">

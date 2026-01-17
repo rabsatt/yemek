@@ -37,6 +37,7 @@ export default function LogMealPage() {
     items: SelectedMealItem[]
     mealType: MealType
     notes: string
+    eatenAt: Date
   }) => {
     if (!selectedPlace || data.items.length === 0 || !user) return
 
@@ -52,6 +53,7 @@ export default function LogMealPage() {
         })),
         mealType: data.mealType,
         notes: data.notes || undefined,
+        eatenAt: data.eatenAt,
       })
 
       router.push('/?logged=true')
