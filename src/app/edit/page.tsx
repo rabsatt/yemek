@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter, useParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { ChevronLeft, Check, Minus, Plus, X, Trash2 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { getEntry, getPlaces, getMeals, updateEntry, deleteEntry } from '@/lib/firestore'
@@ -29,8 +29,8 @@ const mealTypes: { value: MealType; label: string }[] = [
 
 export default function EditEntryPage() {
   const router = useRouter()
-  const params = useParams()
-  const entryId = params.id as string
+  const searchParams = useSearchParams()
+  const entryId = searchParams.get('id')
   const { user } = useAuth()
 
   const [entry, setEntry] = useState<MealEntry | null>(null)
@@ -59,11 +59,14 @@ export default function EditEntryPage() {
     if (user && entryId) {
       loadEntry()
       loadPlacesAndMeals()
+    } else if (!entryId) {
+      setError('No entry ID provided')
+      setLoading(false)
     }
   }, [user, entryId])
 
   const loadEntry = async () => {
-    if (!user) return
+    if (!user || !entryId) return
 
     try {
       const data = await getEntry(user.uid, entryId)
@@ -169,7 +172,7 @@ export default function EditEntryPage() {
   }, 0)
 
   const handleSave = async () => {
-    if (!user || !selectedPlace || items.length === 0) return
+    if (!user || !selectedPlace || items.length === 0 || !entryId) return
 
     setSaving(true)
     try {
@@ -195,7 +198,7 @@ export default function EditEntryPage() {
   }
 
   const handleDelete = async () => {
-    if (!user) return
+    if (!user || !entryId) return
 
     try {
       await deleteEntry(user.uid, entryId)

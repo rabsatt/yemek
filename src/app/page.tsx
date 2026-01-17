@@ -109,7 +109,7 @@ export default function DashboardPage() {
   }
 
   const handleEdit = (entry: MealEntry) => {
-    router.push(`/edit/${entry.id}`)
+    router.push(`/edit?id=${entry.id}`)
   }
 
   const handleDelete = async (entryId: string) => {
