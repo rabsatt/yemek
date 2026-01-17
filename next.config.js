@@ -5,8 +5,8 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  // Set basePath if deploying to a repo subfolder (e.g., /meal-tracker)
-  // basePath: '/meal-tracker',
+  basePath: '/yemek',
+  assetPrefix: '/yemek/',
 }
 
 module.exports = nextConfig
