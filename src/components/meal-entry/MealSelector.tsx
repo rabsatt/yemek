@@ -176,7 +176,7 @@ export function MealSelector({ place, onSelect, onBack, initialSelection = [] }:
         />
       </div>
 
-      <div className="flex-1 overflow-auto p-4 space-y-4 pb-32">
+      <div className="flex-1 overflow-auto p-4 space-y-4">
         {loading ? (
           <div className="text-center text-gray-500 py-8">Loading...</div>
         ) : (
@@ -305,31 +305,37 @@ export function MealSelector({ place, onSelect, onBack, initialSelection = [] }:
         )}
       </div>
 
-      {/* Selected items summary & continue button */}
-      {selectedItems.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 shadow-lg">
-          <div className="max-w-lg mx-auto">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <span className="font-medium">{selectedItems.length} item{selectedItems.length > 1 ? 's' : ''}</span>
-                <span className="text-gray-500 ml-2">
-                  ({selectedItems.reduce((sum, i) => sum + i.quantity, 0)} total)
+      {/* Selected items summary & continue button - always visible at bottom */}
+      <div className="sticky bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 shadow-lg mt-auto">
+        <div className="max-w-lg mx-auto">
+          {selectedItems.length > 0 ? (
+            <>
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <span className="font-medium">{selectedItems.length} item{selectedItems.length > 1 ? 's' : ''}</span>
+                  <span className="text-gray-500 ml-2">
+                    ({selectedItems.reduce((sum, i) => sum + i.quantity, 0)} total)
+                  </span>
+                </div>
+                <span className="text-primary-600 font-semibold">
+                  {totalCalories > 0 ? `${totalCalories} cal` : ''}
                 </span>
               </div>
-              <span className="text-primary-600 font-semibold">
-                {totalCalories > 0 ? `${totalCalories} cal` : ''}
-              </span>
-            </div>
-            <Button
-              className="w-full"
-              onClick={handleContinue}
-            >
-              <Check className="w-5 h-5 mr-2" />
-              Continue
-            </Button>
-          </div>
+              <Button
+                className="w-full"
+                onClick={handleContinue}
+              >
+                <Check className="w-5 h-5 mr-2" />
+                Continue
+              </Button>
+            </>
+          ) : (
+            <p className="text-center text-gray-500 py-2">
+              Select items above to continue
+            </p>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Create meal modal */}
       <Modal
