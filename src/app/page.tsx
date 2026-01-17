@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { getEntries, getInsights, createEntry, createMultiItemEntry, deleteEntry } from '@/lib/firestore'
 import { Header } from '@/components/layout/Header'
 import { TodaySummary } from '@/components/dashboard/TodaySummary'
-import { RecentMeals } from '@/components/dashboard/RecentMeals'
+import { TodayMeals } from '@/components/dashboard/TodayMeals'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Button } from '@/components/ui/Button'
 import type { MealEntry, MealType } from '@/types'
@@ -23,7 +23,7 @@ export default function DashboardPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user } = useAuth()
-  const [entries, setEntries] = useState<MealEntry[]>([])
+  const [todayEntries, setTodayEntries] = useState<MealEntry[]>([])
   const [insights, setInsights] = useState<InsightsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [quickLogging, setQuickLogging] = useState(false)
@@ -45,12 +45,18 @@ export default function DashboardPage() {
     if (!user) return
 
     try {
+      // Get today's date range
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const tomorrow = new Date(today)
+      tomorrow.setDate(tomorrow.getDate() + 1)
+
       const [entriesData, insightsData] = await Promise.all([
-        getEntries(user.uid, { limit: 10 }),
+        getEntries(user.uid, { startDate: today, endDate: tomorrow }),
         getInsights(user.uid, 1),
       ])
 
-      setEntries(entriesData)
+      setTodayEntries(entriesData)
       setInsights(insightsData)
     } catch (error) {
       console.error('Failed to fetch data:', error)
@@ -103,7 +109,6 @@ export default function DashboardPage() {
   }
 
   const handleEdit = (entry: MealEntry) => {
-    // Navigate to edit page with entry ID
     router.push(`/edit/${entry.id}`)
   }
 
@@ -112,11 +117,15 @@ export default function DashboardPage() {
 
     try {
       await deleteEntry(user.uid, entryId)
-      // Refresh data after deletion
       fetchData()
     } catch (error) {
       console.error('Failed to delete entry:', error)
     }
+  }
+
+  const handleLogNew = (mealType: MealType) => {
+    // Navigate to log page with meal type pre-selected
+    router.push(`/log?mealType=${mealType}`)
   }
 
   if (loading) {
@@ -126,8 +135,9 @@ export default function DashboardPage() {
         <div className="max-w-lg mx-auto p-4">
           <div className="animate-pulse space-y-4">
             <div className="h-40 bg-gray-200 rounded-xl" />
-            <div className="h-20 bg-gray-200 rounded-xl" />
-            <div className="h-20 bg-gray-200 rounded-xl" />
+            <div className="h-24 bg-gray-200 rounded-xl" />
+            <div className="h-24 bg-gray-200 rounded-xl" />
+            <div className="h-24 bg-gray-200 rounded-xl" />
           </div>
         </div>
       </div>
@@ -135,7 +145,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pb-20">
       <Header title="Meal Tracker" />
 
       <main className="max-w-lg mx-auto p-4 space-y-6">
@@ -145,26 +155,14 @@ export default function DashboardPage() {
           mealCount={insights?.todaySummary.mealCount || 0}
         />
 
-        {/* Recent meals or empty state */}
-        {entries.length > 0 ? (
-          <RecentMeals
-            entries={entries}
-            onQuickLog={handleQuickLog}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-          />
-        ) : (
-          <EmptyState
-            icon={UtensilsCrossed}
-            title="No meals logged yet"
-            description="Start tracking your meals to see your eating patterns and calorie intake."
-            action={
-              <Button onClick={() => router.push('/log')}>
-                Log Your First Meal
-              </Button>
-            }
-          />
-        )}
+        {/* Today's meals grouped by type */}
+        <TodayMeals
+          entries={todayEntries}
+          onQuickLog={handleQuickLog}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          onLogNew={handleLogNew}
+        />
       </main>
 
       {/* Quick log loading overlay */}

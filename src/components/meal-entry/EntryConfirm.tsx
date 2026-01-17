@@ -19,6 +19,7 @@ interface EntryConfirmProps {
     notes: string
   }) => void
   isSubmitting: boolean
+  defaultMealType?: MealType
 }
 
 const mealTypes: { value: MealType; label: string }[] = [
@@ -42,9 +43,10 @@ export function EntryConfirm({
   onBack,
   onConfirm,
   isSubmitting,
+  defaultMealType,
 }: EntryConfirmProps) {
   const [items, setItems] = useState<SelectedMealItem[]>(initialItems)
-  const [mealType, setMealType] = useState<MealType>(getDefaultMealType())
+  const [mealType, setMealType] = useState<MealType>(defaultMealType || getDefaultMealType())
   const [notes, setNotes] = useState('')
 
   const updateItemCalories = (mealItemId: string, calories: number | undefined) => {

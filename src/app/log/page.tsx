@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { createMultiItemEntry } from '@/lib/firestore'
 import { PlaceSelector } from '@/components/meal-entry/PlaceSelector'
@@ -13,11 +13,15 @@ type Step = 1 | 2 | 3
 
 export default function LogMealPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user } = useAuth()
   const [step, setStep] = useState<Step>(1)
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null)
   const [selectedItems, setSelectedItems] = useState<SelectedMealItem[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Get pre-selected meal type from URL if provided
+  const preselectedMealType = searchParams.get('mealType') as MealType | null
 
   const handleSelectPlace = (place: Place) => {
     setSelectedPlace(place)
@@ -78,6 +82,7 @@ export default function LogMealPage() {
           onBack={() => setStep(2)}
           onConfirm={handleConfirm}
           isSubmitting={isSubmitting}
+          defaultMealType={preselectedMealType || undefined}
         />
       )}
     </div>
