@@ -15,6 +15,7 @@ interface TodayMealsProps {
   onEdit: (entry: MealEntry) => void
   onDelete: (entryId: string) => void
   onLogNew: (mealType: MealType) => void
+  showAddButtons?: boolean
 }
 
 interface MealTypeConfig {
@@ -58,6 +59,7 @@ function MealTypeSection({
   onEdit,
   onDelete,
   onLogNew,
+  showAddButton = true,
 }: {
   config: MealTypeConfig
   entries: MealEntry[]
@@ -65,6 +67,7 @@ function MealTypeSection({
   onEdit: (entry: MealEntry) => void
   onDelete: (entryId: string) => void
   onLogNew: () => void
+  showAddButton?: boolean
 }) {
   const [expanded, setExpanded] = useState(entries.length > 0)
   const [showMenu, setShowMenu] = useState<string | null>(null)
@@ -205,26 +208,34 @@ function MealTypeSection({
           })}
 
           {/* Add button */}
-          <button
-            onClick={onLogNew}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 text-primary-600 hover:bg-primary-50 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            <span className="text-sm font-medium">Add {config.label.toLowerCase()}</span>
-          </button>
+          {showAddButton && (
+            <button
+              onClick={onLogNew}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 text-primary-600 hover:bg-primary-50 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="text-sm font-medium">Add {config.label.toLowerCase()}</span>
+            </button>
+          )}
         </div>
       )}
 
-      {/* Empty state - show add button */}
+      {/* Empty state - show add button or just empty text */}
       {!hasEntries && (
         <div className="border-t border-gray-100">
-          <button
-            onClick={onLogNew}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 text-primary-600 hover:bg-primary-50 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            <span className="text-sm font-medium">Add {config.label.toLowerCase()}</span>
-          </button>
+          {showAddButton ? (
+            <button
+              onClick={onLogNew}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 text-primary-600 hover:bg-primary-50 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="text-sm font-medium">Add {config.label.toLowerCase()}</span>
+            </button>
+          ) : (
+            <div className="px-4 py-3 text-center text-sm text-gray-400">
+              No {config.label.toLowerCase()} logged
+            </div>
+          )}
         </div>
       )}
 
@@ -260,7 +271,7 @@ function MealTypeSection({
   )
 }
 
-export function TodayMeals({ entries, onQuickLog, onEdit, onDelete, onLogNew }: TodayMealsProps) {
+export function TodayMeals({ entries, onQuickLog, onEdit, onDelete, onLogNew, showAddButtons = true }: TodayMealsProps) {
   // Group entries by meal type
   const entriesByType = mealTypeConfig.reduce((acc, config) => {
     acc[config.type] = entries.filter(e => e.mealType === config.type)
@@ -269,8 +280,6 @@ export function TodayMeals({ entries, onQuickLog, onEdit, onDelete, onLogNew }: 
 
   return (
     <div className="space-y-3">
-      <h2 className="text-lg font-semibold text-gray-900">Today's Meals</h2>
-
       {mealTypeConfig.map((config) => (
         <MealTypeSection
           key={config.type}
@@ -280,6 +289,7 @@ export function TodayMeals({ entries, onQuickLog, onEdit, onDelete, onLogNew }: 
           onEdit={onEdit}
           onDelete={onDelete}
           onLogNew={() => onLogNew(config.type)}
+          showAddButton={showAddButtons}
         />
       ))}
     </div>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { UtensilsCrossed } from 'lucide-react'
+import { UtensilsCrossed, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { getEntries, getInsights, createEntry, createMultiItemEntry, deleteEntry } from '@/lib/firestore'
 import { Header } from '@/components/layout/Header'
@@ -19,11 +19,35 @@ interface InsightsData {
   }
 }
 
+function formatDateHeader(date: Date): string {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const compareDate = new Date(date)
+  compareDate.setHours(0, 0, 0, 0)
+
+  const diffDays = Math.floor((today.getTime() - compareDate.getTime()) / (1000 * 60 * 60 * 24))
+
+  if (diffDays === 0) return "Today's Meals"
+  if (diffDays === 1) return "Yesterday's Meals"
+
+  return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+}
+
+function isToday(date: Date): boolean {
+  const today = new Date()
+  return date.toDateString() === today.toDateString()
+}
+
 export default function DashboardPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user } = useAuth()
-  const [todayEntries, setTodayEntries] = useState<MealEntry[]>([])
+  const [selectedDate, setSelectedDate] = useState<Date>(() => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    return today
+  })
+  const [entries, setEntries] = useState<MealEntry[]>([])
   const [insights, setInsights] = useState<InsightsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [quickLogging, setQuickLogging] = useState(false)
@@ -39,30 +63,55 @@ export default function DashboardPage() {
     if (justLogged) {
       window.history.replaceState({}, '', '/')
     }
-  }, [user, justLogged])
+  }, [user, justLogged, selectedDate])
 
   const fetchData = async () => {
     if (!user) return
 
+    setLoading(true)
     try {
-      // Get today's date range
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      const tomorrow = new Date(today)
-      tomorrow.setDate(tomorrow.getDate() + 1)
+      // Get selected date range
+      const startDate = new Date(selectedDate)
+      startDate.setHours(0, 0, 0, 0)
+      const endDate = new Date(startDate)
+      endDate.setDate(endDate.getDate() + 1)
 
       const [entriesData, insightsData] = await Promise.all([
-        getEntries(user.uid, { startDate: today, endDate: tomorrow }),
+        getEntries(user.uid, { startDate, endDate }),
         getInsights(user.uid, 1),
       ])
 
-      setTodayEntries(entriesData)
+      setEntries(entriesData)
       setInsights(insightsData)
     } catch (error) {
       console.error('Failed to fetch data:', error)
     } finally {
       setLoading(false)
     }
+  }
+
+  const goToPreviousDay = () => {
+    const newDate = new Date(selectedDate)
+    newDate.setDate(newDate.getDate() - 1)
+    setSelectedDate(newDate)
+  }
+
+  const goToNextDay = () => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const newDate = new Date(selectedDate)
+    newDate.setDate(newDate.getDate() + 1)
+
+    // Don't go past today
+    if (newDate <= today) {
+      setSelectedDate(newDate)
+    }
+  }
+
+  const goToToday = () => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    setSelectedDate(today)
   }
 
   const handleQuickLog = async (entry: MealEntry) => {
@@ -144,24 +193,67 @@ export default function DashboardPage() {
     )
   }
 
+  const isTodaySelected = isToday(selectedDate)
+
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       <Header title="Meal Tracker" />
 
       <main className="max-w-lg mx-auto p-4 space-y-6">
-        {/* Today's summary */}
-        <TodaySummary
-          totalCalories={insights?.todaySummary.totalCalories || 0}
-          mealCount={insights?.todaySummary.mealCount || 0}
-        />
+        {/* Date navigation */}
+        <div className="flex items-center justify-between bg-white rounded-xl p-3 shadow-sm">
+          <button
+            onClick={goToPreviousDay}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            aria-label="Previous day"
+          >
+            <ChevronLeft className="w-5 h-5 text-gray-600" />
+          </button>
 
-        {/* Today's meals grouped by type */}
+          <div className="text-center">
+            <h2 className="font-semibold text-gray-900">
+              {formatDateHeader(selectedDate)}
+            </h2>
+            {!isTodaySelected && (
+              <button
+                onClick={goToToday}
+                className="text-sm text-primary-600 hover:text-primary-700 mt-1"
+              >
+                Go to today
+              </button>
+            )}
+          </div>
+
+          <button
+            onClick={goToNextDay}
+            disabled={isTodaySelected}
+            className={`p-2 rounded-lg transition-colors ${
+              isTodaySelected
+                ? 'text-gray-300 cursor-not-allowed'
+                : 'hover:bg-gray-100 text-gray-600'
+            }`}
+            aria-label="Next day"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Summary - only show for today */}
+        {isTodaySelected && (
+          <TodaySummary
+            totalCalories={insights?.todaySummary.totalCalories || 0}
+            mealCount={insights?.todaySummary.mealCount || 0}
+          />
+        )}
+
+        {/* Meals grouped by type */}
         <TodayMeals
-          entries={todayEntries}
+          entries={entries}
           onQuickLog={handleQuickLog}
           onEdit={handleEdit}
           onDelete={handleDelete}
           onLogNew={handleLogNew}
+          showAddButtons={isTodaySelected}
         />
       </main>
 
