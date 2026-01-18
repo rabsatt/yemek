@@ -6,12 +6,14 @@ interface TodaySummaryProps {
   totalCalories: number
   mealCount: number
   calorieGoal?: number
+  label?: string
 }
 
 export function TodaySummary({
   totalCalories,
   mealCount,
   calorieGoal = 2000,
+  label = 'Today',
 }: TodaySummaryProps) {
   const percentage = Math.min((totalCalories / calorieGoal) * 100, 100)
   const isOverGoal = totalCalories > calorieGoal
@@ -19,9 +21,9 @@ export function TodaySummary({
   return (
     <Card className="bg-gradient-to-br from-primary-500 to-primary-600 text-white border-0">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold opacity-90">Today</h2>
+        <h2 className="text-lg font-semibold opacity-90">{label}</h2>
         <span className="text-sm opacity-75">
-          {mealCount} {mealCount === 1 ? 'meal' : 'meals'} logged
+          {mealCount} {mealCount === 1 ? 'entry' : 'entries'} logged
         </span>
       </div>
 

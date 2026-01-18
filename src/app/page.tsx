@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { UtensilsCrossed, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { getEntries, getInsights, createEntry, createMultiItemEntry, deleteEntry } from '@/lib/firestore'
+import { getEntries, createEntry, createMultiItemEntry, deleteEntry } from '@/lib/firestore'
 import { Header } from '@/components/layout/Header'
 import { TodaySummary } from '@/components/dashboard/TodaySummary'
 import { TodayMeals } from '@/components/dashboard/TodayMeals'
@@ -12,11 +12,9 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { Button } from '@/components/ui/Button'
 import type { MealEntry, MealType } from '@/types'
 
-interface InsightsData {
-  todaySummary: {
-    totalCalories: number
-    mealCount: number
-  }
+interface DaySummary {
+  totalCalories: number
+  mealCount: number
 }
 
 function formatDateHeader(date: Date): string {
@@ -48,7 +46,6 @@ export default function DashboardPage() {
     return today
   })
   const [entries, setEntries] = useState<MealEntry[]>([])
-  const [insights, setInsights] = useState<InsightsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [quickLogging, setQuickLogging] = useState(false)
 
@@ -76,18 +73,19 @@ export default function DashboardPage() {
       const endDate = new Date(startDate)
       endDate.setDate(endDate.getDate() + 1)
 
-      const [entriesData, insightsData] = await Promise.all([
-        getEntries(user.uid, { startDate, endDate }),
-        getInsights(user.uid, 1),
-      ])
-
+      const entriesData = await getEntries(user.uid, { startDate, endDate })
       setEntries(entriesData)
-      setInsights(insightsData)
     } catch (error) {
       console.error('Failed to fetch data:', error)
     } finally {
       setLoading(false)
     }
+  }
+
+  // Calculate summary from actual entries displayed
+  const daySummary: DaySummary = {
+    totalCalories: entries.reduce((sum, entry) => sum + (entry.calories ?? 0), 0),
+    mealCount: entries.length,
   }
 
   const goToPreviousDay = () => {
@@ -238,13 +236,12 @@ export default function DashboardPage() {
           </button>
         </div>
 
-        {/* Summary - only show for today */}
-        {isTodaySelected && (
-          <TodaySummary
-            totalCalories={insights?.todaySummary.totalCalories || 0}
-            mealCount={insights?.todaySummary.mealCount || 0}
-          />
-        )}
+        {/* Summary */}
+        <TodaySummary
+          totalCalories={daySummary.totalCalories}
+          mealCount={daySummary.mealCount}
+          label={isTodaySelected ? 'Today' : formatDateHeader(selectedDate).replace("'s Meals", '')}
+        />
 
         {/* Meals grouped by type */}
         <TodayMeals
