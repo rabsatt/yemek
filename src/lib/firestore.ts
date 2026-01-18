@@ -482,6 +482,14 @@ export async function deleteEntry(userId: string, entryId: string): Promise<void
 
 // ============ INSIGHTS ============
 
+// Helper to format date as YYYY-MM-DD in local timezone
+function formatLocalDate(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 export async function getInsights(userId: string, days: number = 7) {
   const startDate = new Date()
   startDate.setDate(startDate.getDate() - days + 1)
@@ -498,11 +506,11 @@ export async function getInsights(userId: string, days: number = 7) {
     outCount: number
   }> = {}
 
-  // Initialize all days
+  // Initialize all days using local timezone
   for (let i = 0; i < days; i++) {
     const date = new Date()
     date.setDate(date.getDate() - days + 1 + i)
-    const dateStr = date.toISOString().split('T')[0]
+    const dateStr = formatLocalDate(date)
     dailyData[dateStr] = {
       date: dateStr,
       totalCalories: 0,
@@ -512,9 +520,9 @@ export async function getInsights(userId: string, days: number = 7) {
     }
   }
 
-  // Aggregate entries
+  // Aggregate entries using local timezone for date comparison
   entries.forEach((entry) => {
-    const dateStr = entry.eatenAt.toISOString().split('T')[0]
+    const dateStr = formatLocalDate(entry.eatenAt)
     if (dailyData[dateStr]) {
       dailyData[dateStr].mealCount += 1
       // For multi-item entries, use the total calories; for legacy, use entry calories
@@ -528,7 +536,7 @@ export async function getInsights(userId: string, days: number = 7) {
   })
 
   // Today's summary
-  const today = new Date().toISOString().split('T')[0]
+  const today = formatLocalDate(new Date())
   const todaySummary = dailyData[today] || {
     date: today,
     totalCalories: 0,
